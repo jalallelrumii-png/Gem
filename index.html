@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SmartKasir Ultra</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#4f46e5">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+    
+    <script type="importmap">
+    {
+      "imports": {
+        "react": "https://esm.sh/react@19.0.0",
+        "react-dom": "https://esm.sh/react-dom@19.0.0/client"
+      }
+    }
+    </script>
+
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; -webkit-tap-highlight-color: transparent; }
+        .glass { background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(12px); border-top: 1px solid rgba(255,255,255,0.5); }
+        .hide-scroll::-webkit-scrollbar { display: none; }
+        .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+    </style>
+</head>
+<body class="bg-[#F8FAFC] text-slate-900 overflow-hidden">
+    <div id="root"></div>
+
+    <script type="text/babel" data-type="module">
+        import React, { useState, useEffect } from 'react';
+        import { createRoot } from 'react-dom';
+
+        const App = () => {
+            const [view, setView] = useState('pos');
+            const [products, setProducts] = useState(() => JSON.parse(localStorage.getItem('products')) || [
+                { id: 1, name: 'Kopi Susu Senja', price: 15000, stock: 20, cat: 'Minuman' },
+                { id: 2, name: 'Indomie Goreng', price: 12000, stock: 15, cat: 'Makanan' },
+                { id: 3, name: 'Roti Bakar', price: 10000, stock: 10, cat: 'Makanan' }
+            ]);
+            const [cart, setCart] = useState([]);
+            const [orders, setOrders] = useState(() => JSON.parse(localStorage.getItem('orders')) || []);
+
+            useEffect(() => {
+                localStorage.setItem('products', JSON.stringify(products));
+                localStorage.setItem('orders', JSON.stringify(orders));
+            }, [products, orders]);
+
+            const addToCart = (p) => {
+                if (p.stock <= 0) return alert('Stok Habis!');
+                setCart(prev => {
+                    const exist = prev.find(i => i.id === p.id);
+                    if (exist) return prev.map(i => i.id === p.id ? {...i, qty: i.qty + 1} : i);
+                    return [...prev, {...p, qty: 1}];
+                });
+            };
+
+            const checkout = () => {
+                const total = cart.reduce((sum, i) => sum + (i.price * i.qty), 0);
+                const newOrder = { id: Date.now(), items: cart, total, date: new Date().toISOString() };
+                
+                setOrders([newOrder, ...orders]);
+                setProducts(products.map(p => {
+                    const sold = cart.find(c => c.id === p.id);
+                    return sold ? { ...p, stock: p.stock - sold.qty } : p;
+                }));
+                setCart([]);
+                alert('Transaksi Berhasil!');
+            };
+
+            return (
+                <div className="max-w-md mx-auto h-screen relative bg-white shadow-2xl flex flex-col">
+                    {/* Header */}
+                    <header className="p-6 flex justify-between items-center bg-white/80 backdrop-blur-md z-10">
+                        <h1 className="text-2xl font-800 tracking-tight text-indigo-600">SMART<span className="text-slate-900">KASIR</span></h1>
+                        <div className="bg-indigo-50 px-3 py-1 rounded-full text-[10px] font-bold text-indigo-600 uppercase">OFFLINE MODE</div>
+                    </header>
+
+                    {/* Main Content */}
+                    <main className="flex-1 overflow-y-auto px-6 pb-40 hide-scroll">
+                        {view === 'pos' && (
+                            <div className="space-y-6">
+                                <div className="grid grid-cols-2 gap-4">
+                                    {products.map(p => (
+                                        <button key={p.id} onClick={() => addToCart(p)} className="p-4 bg-slate-50 border border-slate-100 rounded-[2rem] text-left hover:border-indigo-500 transition-all active:scale-95">
+                                            <div className="text-lg font-black text-slate-800">Rp {p.price.toLocaleString()}</div>
+                                            <div className="text-sm text-slate-500 font-medium truncate">{p.name}</div>
+                                            <div className="mt-3 inline-block px-2 py-1 bg-white rounded-lg text-[10px] font-bold text-indigo-500 uppercase">Stok: {p.stock}</div>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {view === 'history' && (
+                            <div className="space-y-4">
+                                <h2 className="text-sm font-bold text-slate-400 uppercase tracking-widest">Riwayat Transaksi</h2>
+                                {orders.length === 0 && <p className="text-center py-10 text-slate-400">Belum ada transaksi</p>}
+                                {orders.map(o => (
+                                    <div key={o.id} className="p-5 border border-slate-100 rounded-3xl flex justify-between items-center bg-slate-50/50">
+                                        <div>
+                                            <div className="text-[10px] font-bold text-slate-400 uppercase">{new Date(o.date).toLocaleTimeString()}</div>
+                                            <div className="font-bold text-slate-800">Order #{o.id.toString().slice(-4)}</div>
+                                        </div>
+                                        <div className="text-right">
+                                            <div className="font-black text-indigo-600 italic">Rp {o.total.toLocaleString()}</div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </main>
+
+                    {/* Floating Cart */}
+                    {cart.length > 0 && view === 'pos' && (
+                        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 w-[90%] max-w-[360px] glass p-6 rounded-[2.5rem] shadow-2xl z-20 border border-white">
+                            <div className="flex justify-between items-center mb-4">
+                                <span className="text-sm font-bold text-slate-500">{cart.length} Produk</span>
+                                <span className="text-xl font-900 text-slate-900">Rp {cart.reduce((s, i) => s + (i.price * i.qty), 0).toLocaleString()}</span>
+                            </div>
+                            <button onClick={checkout} className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black shadow-lg shadow-indigo-200 active:scale-95 transition-all">BAYAR SEKARANG</button>
+                        </div>
+                    )}
+
+                    {/* Navbar */}
+                    <nav className="bg-white border-t border-slate-50 px-12 py-6 pb-safe flex justify-between items-center">
+                        <button onClick={() => setView('pos')} className={view === 'pos' ? 'text-indigo-600' : 'text-slate-300'}>
+                            <svg className="w-7 h-7" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>
+                        </button>
+                        <button onClick={() => setView('history')} className={view === 'history' ? 'text-indigo-600' : 'text-slate-300'}>
+                            <svg className="w-7 h-7" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                        </button>
+                    </nav>
+                </div>
+            );
+        };
+
+        const root = createRoot(document.getElementById('root'));
+        root.render(<App />);
+
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js').catch(console.error);
+            });
+        }
+    </script>
+</body>
+</html>
